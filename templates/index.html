@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>古诗生成系统</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body {
+      background: url('/static/bd.jpeg') no-repeat center center fixed;
+      background-size: cover;
+      font-family: 'KaiTi', 'STKaiti', serif;
+    }
+  </style>
+</head>
+<body class="min-h-screen flex items-center justify-center">
+  <div class="w-full max-w-2xl p-6 rounded-2xl shadow-xl bg-white bg-opacity-30 backdrop-blur-md">
+    <h1 class="text-2xl font-bold mb-6 text-center">千年诗意  一念即生</h1>
+
+    <!-- 起始词 -->
+    <label class="block mb-2">输⼊起始字/句⼦：</label>
+    <input id="start" type="text" placeholder="如：日、月、思乡" class="w-full mb-4 p-2 border rounded" />
+
+    <!-- 诗体 -->
+    <label class="block mb-2">选择诗体：</label>
+    <select id="poem_type" class="w-full mb-4 p-2 border rounded">
+      <option value="五言">五言</option>
+      <option value="七言">七言</option>
+    </select>
+
+    <!-- 模型 -->
+    <label class="block mb-2">选择模型：</label>
+    <select id="model" class="w-full mb-4 p-2 border rounded">
+      <option value="rnn">RNN</option>
+      <option value="transformer" >Transformer</option>
+    </select>
+
+    <!-- 字数 -->
+    <label class="block mb-2">生成长度（包含起始字）：</label>
+    <input id="length" type="number" value="20" class="w-full mb-1 p-2 border rounded" />
+    <p class="text-sm text-gray-500 mb-4">建议五言为 20，七言为 28。</p>
+
+    <!-- 策略 -->
+    <label class="block mb-2">采样策略：</label>
+    <select id="sampling" class="w-full mb-2 p-2 border rounded" onchange="toggleSamplingParams()">
+      <option value="top_k">Top-K</option>
+      <option value="top_p">Top-P</option>
+      <option value="temperature">Temperature</option>
+    </select>
+
+    <!-- Top-K 参数区 -->
+    <div id="param-top_k" class="mb-4">
+      <label class="block text-sm text-gray-700">Top-K 参数：</label>
+      <input type="number" id="top_k" value="8" min="1" class="w-full p-2 border rounded" />
+      <p class="text-sm text-gray-500 mt-1">建议值：5~15。数值越大越自由，越小越规范。</p>
+    </div>
+
+    <!-- Top-P 参数区 -->
+    <div id="param-top_p" class="mb-4 hidden">
+      <label class="block text-sm text-gray-700">Top-P 参数：</label>
+      <input type="number" id="top_p" value="0.9" step="0.05" min="0.05" max="1.0" class="w-full p-2 border rounded" />
+      <p class="text-sm text-gray-500 mt-1">建议值：0.85~0.95。越大越奔放，越小越稳定。</p>
+    </div>
+
+    <!-- Temperature 参数区 -->
+    <div id="param-temperature" class="mb-4 hidden">
+      <label class="block text-sm text-gray-700">Temperature 参数：</label>
+      <input type="number" id="temperature" value="0.8" step="0.1" min="0.1" max="2.0" class="w-full p-2 border rounded" />
+      <p class="text-sm text-gray-500 mt-1">建议值：0.7~1.0。越低越保守，越高越有创造力。</p>
+    </div>
+
+    <!-- 按钮 -->
+    <button id="generateBtn" class="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700 transition">
+      生成古诗
+    </button>
+
+    <!-- 结果 -->
+    <pre id="result" class="mt-6 p-4 bg-white bg-opacity-30 rounded whitespace-pre-wrap text-center font-kaiti text-lg text-black shadow-inner"></pre>
+  </div>
+
+  <script>
+    // 显示对应参数输入框
+    function toggleSamplingParams() {
+      const strategy = document.getElementById("sampling").value;
+      ["top_k", "top_p", "temperature"].forEach(s => {
+        document.getElementById("param-" + s).classList.add("hidden");
+      });
+      document.getElementById("param-" + strategy).classList.remove("hidden");
+    }
+
+    // 自动设置五言/七言长度
+    document.getElementById("poem_type").addEventListener("change", function () {
+      const type = this.value;
+      document.getElementById("length").value = type === "五言" ? 20 : 28;
+    });
+
+    // 提交请求生成古诗
+    document.getElementById("generateBtn").addEventListener("click", async () => {
+      const start = document.getElementById("start").value.trim();
+      const length = parseInt(document.getElementById("length").value);
+      const model = document.getElementById("model").value;
+      const sampling = document.getElementById("sampling").value;
+      const top_k = parseInt(document.getElementById("top_k").value);
+      const top_p = parseFloat(document.getElementById("top_p").value);
+      const temperature = parseFloat(document.getElementById("temperature").value);
+
+      const btn = document.getElementById("generateBtn");
+      btn.textContent = "生成中...";
+      btn.disabled = true;
+
+      try {
+        const res = await fetch("/generate_poem", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            start,
+            length,
+            model,
+            sampling,
+            top_k,
+            top_p,
+            temperature
+          }),
+        });
+        const data = await res.json();
+        if (data.poem) {
+          document.getElementById("result").textContent = data.poem;
+        } else {
+          document.getElementById("result").textContent = data.error || "生成失败。";
+        }
+      } catch (err) {
+        alert("生成失败，请检查后端服务是否正常运行。");
+      } finally {
+        btn.textContent = "生成古诗";
+        btn.disabled = false;
+      }
+    });
+
+    // 初始化显示默认参数
+    window.addEventListener("DOMContentLoaded", toggleSamplingParams);
+  </script>
+</body>
+</html>
